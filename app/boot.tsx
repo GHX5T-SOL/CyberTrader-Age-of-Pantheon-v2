@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Audio } from 'expo-av';
 import { COLORS, FONTS, FONT_SIZES, SPACING } from '../src/theme';
 import { useGameStore } from '../src/stores/gameStore';
 import { usePlayerStore } from '../src/stores/playerStore';
@@ -83,44 +82,9 @@ export default function BootScreen() {
   const [progressPct, setProgressPct] = useState(0);
 
   const scrollRef = useRef<ScrollView>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
-
   const { setPhase } = useGameStore();
   const profile = usePlayerStore((s) => s.profile);
   const { initializeMarket } = useMarketStore();
-
-  // Play boot music
-  useEffect(() => {
-    let mounted = true;
-
-    async function playMusic() {
-      try {
-        if (Platform.OS !== 'web') {
-          await Audio.setAudioModeAsync({
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: false,
-          });
-        }
-        const { sound } = await Audio.Sound.createAsync(
-          { uri: '/audio/boot-music.mp3' },
-          { isLooping: true, volume: 0.3, shouldPlay: true }
-        );
-        if (mounted) {
-          soundRef.current = sound;
-        } else {
-          await sound.unloadAsync();
-        }
-      } catch {
-        // Audio not available — silent fallback
-      }
-    }
-
-    playMusic();
-    return () => {
-      mounted = false;
-      soundRef.current?.unloadAsync();
-    };
-  }, []);
 
   // Boot sequence
   useEffect(() => {
@@ -157,13 +121,8 @@ export default function BootScreen() {
   useEffect(() => {
     if (bootComplete) {
       const timer = setTimeout(() => {
-        // Fade out audio
-        soundRef.current?.setVolumeAsync(0.1).catch(() => {});
-        setTimeout(() => {
-          soundRef.current?.stopAsync().catch(() => {});
-          setPhase('playing');
-          router.replace('/cyberdeck');
-        }, 300);
+        setPhase('playing');
+        router.replace('/cyberdeck');
       }, 1200);
       return () => clearTimeout(timer);
     }
