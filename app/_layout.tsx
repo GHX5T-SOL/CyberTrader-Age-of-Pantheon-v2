@@ -6,23 +6,58 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
 import { COLORS } from '../src/theme';
 
+const BOOT_MUSIC_PATH = '/audio/boot-music.mp3';
+
 export default function RootLayout() {
   const soundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      if (typeof document === 'undefined') {
+        return;
+      }
+
+      const audio = document.createElement('audio');
+      audio.src = new URL(BOOT_MUSIC_PATH, window.location.origin).href;
+      audio.loop = true;
+      audio.volume = 0.3;
+      audio.preload = 'auto';
+
+      const tryPlay = () => {
+        void audio.play().then(() => {
+          document.removeEventListener('pointerdown', resume);
+          window.removeEventListener('keydown', resume);
+        }).catch(() => {});
+      };
+
+      const resume = () => {
+        tryPlay();
+      };
+
+      tryPlay();
+      document.addEventListener('pointerdown', resume, { passive: true });
+      window.addEventListener('keydown', resume, { passive: true });
+
+      return () => {
+        document.removeEventListener('pointerdown', resume);
+        window.removeEventListener('keydown', resume);
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+      };
+    }
+
     let mounted = true;
 
-    async function startBackgroundMusic() {
+    async function startNativeBackgroundMusic() {
       try {
-        if (Platform.OS !== 'web') {
-          await Audio.setAudioModeAsync({
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: false,
-          });
-        }
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+        });
 
         const { sound } = await Audio.Sound.createAsync(
-          { uri: '/audio/boot-music.mp3' },
+          { uri: BOOT_MUSIC_PATH },
           { isLooping: true, volume: 0.3, shouldPlay: true }
         );
 
@@ -32,11 +67,11 @@ export default function RootLayout() {
           await sound.unloadAsync();
         }
       } catch {
-        // Audio can fail when autoplay is blocked by browser policy.
+        // Audio unavailable — silent fallback
       }
     }
 
-    startBackgroundMusic();
+    void startNativeBackgroundMusic();
 
     return () => {
       mounted = false;
